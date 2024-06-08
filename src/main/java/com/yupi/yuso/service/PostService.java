@@ -61,11 +61,18 @@ public interface PostService extends IService<Post> {
 
     /**
      * 分页查询帖子
+     *
      * @param postQueryRequest
      * @param request
      * @return
      */
     Page<PostVO> listPostVOByPage(PostQueryRequest postQueryRequest, HttpServletRequest request);
 
+    /**
+     * 搜索提示
+     *
+     * @param keyword 搜索关键字
+     * @return 搜索提示（文章标题）
+     */
     List<String> getSearchPrompt(String keyword);
 }
