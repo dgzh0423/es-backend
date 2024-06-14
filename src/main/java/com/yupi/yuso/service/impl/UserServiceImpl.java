@@ -282,8 +282,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public Page<UserVO> listUserVOByPage(UserQueryRequest userQueryRequest) {
         long current = userQueryRequest.getCurrent();
         long size = userQueryRequest.getPageSize();
+        String searchText = userQueryRequest.getUserName();
 
-        String redisKey = String.format("es:user:all:page:%s", current);
+        // todo 按页缓存有bug，当redis有缓存之后，再根据关键字搜索就无效了，因为走的是缓存
+        // 解决：按搜索词 + 页号缓存
+        String redisKey = String.format("es:user:searchText:%s:page:%s", searchText, current);
         ValueOperations<String, Object> operations = redisTemplate.opsForValue();
         Page<UserVO> userVOPage = (Page<UserVO>) operations.get(redisKey);
         // 有缓存，直接走缓存
@@ -300,7 +303,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                 // 正常应该是前端的页号只显示到有数据的最后一页
                 operations.set(redisKey, userVOPage, 5, TimeUnit.MINUTES);
             }catch (Exception e){
-                log.error("redis set key error", e);
+                log.error("Redis set cache error", e);
             }
         }
         return userVOPage;
