@@ -18,6 +18,7 @@ import com.yupi.yuso.service.UserService;
 import com.yupi.yuso.utils.SqlUtils;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Resource;
@@ -45,6 +46,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 盐值，混淆密码
      */
     private static final String SALT = "ELASTICSEARCH";
+
+    /**
+     * 默认搜索词
+     */
+    private static final String DEFAULT_SEARCH_TEXT = "all";
+
 
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
@@ -282,7 +289,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public Page<UserVO> listUserVOByPage(UserQueryRequest userQueryRequest) {
         long current = userQueryRequest.getCurrent();
         long size = userQueryRequest.getPageSize();
-        String searchText = userQueryRequest.getUserName();
+        Optional<String> searchTextOptional = Optional.of(userQueryRequest)
+                .map(UserQueryRequest::getUserName);
+        String searchText = searchTextOptional.orElse(DEFAULT_SEARCH_TEXT);
 
         // todo 按页缓存有bug，当redis有缓存之后，再根据关键字搜索就无效了，因为走的是缓存
         // 解决：按搜索词 + 页号缓存
