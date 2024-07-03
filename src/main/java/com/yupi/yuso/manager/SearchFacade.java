@@ -21,7 +21,10 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 搜索门面
@@ -45,6 +48,23 @@ public class SearchFacade {
     @Resource
     private DataSourceRegistry dataSourceRegistry;
 
+    // 线程池相关常量，搜索IO密集型
+    private static final int CORE_POOL_SIZE = 12;
+
+    private static final int MAX_POOL_SIZE = 15;
+
+    private static final int QUEUE_CAPACITY = 100;
+
+    private static final Long KEEP_ALIVE_TIME = 1L;
+
+    private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(
+            CORE_POOL_SIZE,
+            MAX_POOL_SIZE,
+            KEEP_ALIVE_TIME,
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(QUEUE_CAPACITY),
+            new ThreadPoolExecutor.CallerRunsPolicy());
+
 
     public SearchVO searchAll(@RequestBody SearchRequest searchRequest, HttpServletRequest request) {
         String type = searchRequest.getType();
@@ -60,7 +80,7 @@ public class SearchFacade {
                 UserQueryRequest userQueryRequest = new UserQueryRequest();
                 userQueryRequest.setUserName(searchText);
                 return userDataSource.doSearch(searchText, current, pageSize);
-            });
+            }, EXECUTOR);
 
             CompletableFuture<Page<PostVO>> postTask = CompletableFuture.supplyAsync(() -> {
                 // 获取 HttpServletRequest 对象并存储到 ThreadLocal 中
@@ -72,9 +92,10 @@ public class SearchFacade {
                     // 清空 ThreadLocal 中存储的 HttpServletRequest 对象
                     RequestContextHolder.resetRequestAttributes();
                 }
-            });
+            }, EXECUTOR);
 
-            CompletableFuture<Page<Picture>> pictureTask = CompletableFuture.supplyAsync(() -> pictureDataSource.doSearch(searchText, 1, 10));
+            CompletableFuture<Page<Picture>> pictureTask = CompletableFuture.supplyAsync(() ->
+                    pictureDataSource.doSearch(searchText, 1, 10), EXECUTOR);
 
             CompletableFuture.allOf(userTask, postTask, pictureTask).join();
             try {
